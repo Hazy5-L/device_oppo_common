@@ -20,19 +20,25 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.content.SharedPreferences;
+import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.UserHandle;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceScreen;
 import android.preference.SwitchPreference;
+import android.provider.Settings;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -44,6 +50,7 @@ import com.android.internal.util.slim.DeviceUtils.FilteredDeviceFeaturesArray;
 
 import com.slim.device.KernelControl;
 import com.slim.device.R;
+import com.slim.device.util.FileUtils;
 import com.slim.device.util.ShortcutPickerHelper;
 
 public class ScreenOffGesture extends PreferenceFragment implements
@@ -62,6 +69,8 @@ public class ScreenOffGesture extends PreferenceFragment implements
     public static final String PREF_GESTURE_ARROW_RIGHT = "gesture_arrow_right";
     public static final String PREF_GESTURE_DOUBLE_TAP = "gesture_double_tap";
 
+    private static final String KEY_HAPTIC_FEEDBACK = "touchscreen_gesture_haptic_feedback";
+
     private static final int DLG_SHOW_ACTION_DIALOG  = 0;
     private static final int DLG_RESET_TO_DEFAULT    = 1;
 
@@ -75,6 +84,7 @@ public class ScreenOffGesture extends PreferenceFragment implements
     private Preference mGestureArrowRight;
     private Preference mGestureDoubleTap;
     private SwitchPreference mEnableGestures;
+    private SwitchPreference mHapticFeedback;
 
     private boolean mCheckPreferences;
     private SharedPreferences mScreenOffGestureSharedPreferences;
@@ -128,6 +138,7 @@ public class ScreenOffGesture extends PreferenceFragment implements
         prefs = getPreferenceScreen();
 
         mEnableGestures = (SwitchPreference) prefs.findPreference(PREF_GESTURE_ENABLE);
+        mHapticFeedback = (SwitchPreference) prefs.findPreference(KEY_HAPTIC_FEEDBACK);
 
         mGestureCircle = (Preference) prefs.findPreference(PREF_GESTURE_CIRCLE);
         mGestureDoubleSwipe = (Preference) prefs.findPreference(PREF_GESTURE_DOUBLE_SWIPE);
@@ -154,6 +165,10 @@ public class ScreenOffGesture extends PreferenceFragment implements
                 mScreenOffGestureSharedPreferences.getBoolean(PREF_GESTURE_ENABLE, true);
         mEnableGestures.setChecked(enableGestures);
         mEnableGestures.setOnPreferenceChangeListener(this);
+        boolean doHapticFeedback =
+                mScreenOffGestureSharedPreferences.getBoolean(KEY_HAPTIC_FEEDBACK, true);
+        mHapticFeedback.setChecked(doHapticFeedback);
+        mHapticFeedback.setOnPreferenceChangeListener(this);
 
         mCheckPreferences = true;
         return prefs;
@@ -222,6 +237,12 @@ public class ScreenOffGesture extends PreferenceFragment implements
         if (!mCheckPreferences) {
             return false;
         }
+        if (preference == mHapticFeedback) {
+            boolean value = (Boolean) newValue;
+            FileUtils.writeLine(ScreenOffGesture.KEY_HAPTIC_FEEDBACK, value ? "1" : "0");
+            return true;
+        }
+
         if (preference == mEnableGestures) {
             mScreenOffGestureSharedPreferences.edit()
                     .putBoolean(PREF_GESTURE_ENABLE, (Boolean) newValue).commit();
@@ -236,6 +257,8 @@ public class ScreenOffGesture extends PreferenceFragment implements
         SharedPreferences.Editor editor = mScreenOffGestureSharedPreferences.edit();
         mScreenOffGestureSharedPreferences.edit()
                 .putBoolean(PREF_GESTURE_ENABLE, true).commit();
+        mScreenOffGestureSharedPreferences.edit()
+                .putBoolean(KEY_HAPTIC_FEEDBACK, true).commit();
         editor.putString(PREF_GESTURE_CIRCLE,
                 ActionConstants.ACTION_CAMERA).commit();
         editor.putString(PREF_GESTURE_DOUBLE_SWIPE,
